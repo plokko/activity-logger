@@ -2,7 +2,10 @@
 
 namespace Plokko\ActivityLogger;
 
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
+use Monolog\Logger;
+use Plokko\ActivityLogger\Logging\ActivLogHandler;
 
 class ActivityLoggerServiceProvider extends ServiceProvider
 {
@@ -13,32 +16,23 @@ class ActivityLoggerServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        /*//--- Publish migrations ---///
-        $this->publishesMigrations([
-            __DIR__ . '/../database/migrations' => database_path('migrations'),
-        ]);
-        $this->loadMigrationsFrom(
-            __DIR__ . '/../database/migrations'
-        );
-        ///--- Translations ---///
-        $this->loadTranslationsFrom(__DIR__ . '/../lang', 'activity-logger');
-        */
-        ///--- Publish config/translation files ---///
+        ///--- Publish config files ---///
         $this->publishes([
             __DIR__ . '/../config/config.php' => config_path('activity-logger.php'),
         ], 'activity-logger:config');
-        /*
-        $this->publishes([
-            __DIR__ . '/../lang' => $this->app->langPath('vendor/activity-logger'),
-        ], 'activity-logger:lang');
-        ///--- Console commands ---///
-        if ($this->app->runningInConsole())
-        {
-            $this->commands([
-                GenerateCommand::class,
-            ]);
-        }
-        */
+
+        ///-- Register custom Log Driver ---///
+        Log::extend('activlog', function ($app, array $config) {
+            $logger = new Logger('activlog');
+
+            $logger->pushHandler(new ActivLogHandler(
+                endpoint: $config['endpoint'] ?? 'http://localhost',
+                token: $config['token'] ?? '',
+                timeout: $config['timeout'] ?? 2,
+            ));
+
+            return $logger;
+        });
     }
 
     /**

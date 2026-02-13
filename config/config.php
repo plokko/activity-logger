@@ -34,6 +34,12 @@ return [
             'days' => 60,
             'path' => storage_path('logs/activity/other.log'),
         ],
+        'activlog' => [
+            'driver' => 'activlog',
+            'endpoint' => env('ACTIVLOG_ENDPOINT'),
+            'token' => env('ACTIVLOG_TOKEN'),
+            'timeout' => 2,
+        ],
     ],
 
     /** Model logs settings */
