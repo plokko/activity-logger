@@ -1,0 +1,24 @@
+{
+    "name": "plokko/activity-logger",
+    "description": "Activity logger",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "Plokko\\ActivityLogger\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.2",
+        "laravel/framework": ">=10.0"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Plokko\\ActivityLogger\\ActivityLoggerServiceProvider"
+            ],
+            "aliases": {
+                "HeathApi": "Plokko\\ActivityLogger\\Facades\\ActivityLog"
+            }
+        }
+    }
+}
