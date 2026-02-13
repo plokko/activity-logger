@@ -24,6 +24,11 @@ return [
             'days' => 60,
             'path' => storage_path('logs/activity/access.log'),
         ],
+        'events' => [
+            'driver' => 'daily',
+            'days' => 60,
+            'path' => storage_path('logs/activity/events.log'),
+        ],
         'default' => [
             'driver' => 'daily',
             'days' => 60,
@@ -37,6 +42,12 @@ return [
         'channel' => 'models',
         /** Text to be replaced for hidden fields when tracking for changes */
         'redacted_text' => '<redacted>',
+    ],
+
+    /** Event logs settings */
+    'events' => [
+        /** Channel to use for model activity */
+        'channel' => 'events',
     ],
 
     /** Logs only this urls */

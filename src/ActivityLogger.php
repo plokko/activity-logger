@@ -32,7 +32,7 @@ class ActivityLogger
         /// Get channel name based on log type ///
         $channel = match ($type) {
             'log' => $this->config['log_channel'] ?? 'default',
-            'models', 'access' => $this->config[$type]['channel'] ?? 'default',
+            'models', 'access', 'events' => $this->config[$type]['channel'] ?? 'default',
             default => throw new UnexpectedValueException("Unexpected LogAction type $type"),
         };
 
@@ -194,6 +194,26 @@ class ActivityLogger
         };
 
         return compact('current', 'previus');
+    }
+
+    /**
+     * Logs a generic event.
+     *
+     * @param  object  $event  Event class
+     * @param  ?array  $data  optional data of the event
+     */
+    public function logEvent(object $event, ?array $data = null): void
+    {
+        $eventClass = $event::class;
+        // Log event //
+        $this->getLoggerFor('events')
+            ->notice("Event $eventClass", $this->getLogData(
+                type: 'event',
+                context: $data,
+                extra: [
+                    'event' => $eventClass,
+                ],
+            ));
     }
 
     /**
