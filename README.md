@@ -127,7 +127,39 @@ class AppServiceProvider extends ServiceProvider
     }
 }
 ```
-The data of the event will be automatically logged if your event implements `JsonSerializable` or `Arrayable` interfaces.
+The data of the event will be automatically logged if your event implements `JsonSerializable`, `Arrayable` or `LoggableEvent` interface:
+
+```php
+use Plokko\ActivityLogger\Contracts\LoggableEvent;
+
+class OrderShipped implements LoggableEvent
+{
+    use Dispatchable, SerializesModels;
+
+    /**
+     * Create a new event instance.
+     */
+    public function __construct(
+        public string $orderCode,
+        public string $OrderDescription,
+        public array $items,
+    ) {}
+ 
+    /**
+     * Get event data for logs
+     *
+     * @return ?array data to be logged or null if it should be ignored.
+     */
+    public function toLoggableData(): ?array{
+        return [
+            'code' => $this->orderCode,
+            'description' => $this->OrderDescription,
+            'item_count' => count($this->items),
+        ];
+    }
+}
+```
+If the event implements multiple interfaces the data will be taken from the first implemented interface in this order: `LoggableEvent`, `Arrayable`, `JsonSerializable`.
 
 ## Configuration
 

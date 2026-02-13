@@ -4,6 +4,7 @@ namespace Plokko\ActivityLogger\Listeners;
 
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
+use Plokko\ActivityLogger\Contracts\LoggableEvent;
 use Plokko\ActivityLogger\Facades\ActivityLog;
 
 class LogEventActivity
@@ -20,7 +21,9 @@ class LogEventActivity
     {
         /// Try to get data for event
         $data = null;
-        if ($event instanceof Arrayable) {
+        if ($event instanceof LoggableEvent) {
+            $data = $event->toLoggableData();
+        } elseif ($event instanceof Arrayable) {
             $data = $event->toArray();
         } elseif ($event instanceof JsonSerializable) {
             $data = $event->jsonSerialize();
