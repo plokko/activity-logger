@@ -14,14 +14,6 @@ Install the package via composer:
 composer require plokko/activity-logger
 ```
 
-### Publishing configuration
-
-To publish default configuration files run this command in console:
-```bash
-php artisan vendor:publish --tag=activity-logger:config
-```
-
-
 ### Setup access logs
 
 Register the AccessLogger middleware in your application
@@ -42,8 +34,25 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         
 ```
-To see how to exclude/include paths/routes see the configuration.
 
+To select what routes/paths to log you can either use the configuration (see the `access` configuration in the log secthion) or define a custom function in your `AppServiceProvider`: 
+
+```php
+use Plokko\ActivityLogger\Facades\ActivityLog;
+use Illuminate\Http\Request;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        ActivityLog::definerRequestMatcher(function(Request $request){
+            /// Your logic here, must return true if has to be logged, false otherwise.
+            return $request->is('admin/*');
+        });
+```
 
 ### Setup model logs
 
@@ -162,5 +171,131 @@ class OrderShipped implements LoggableEvent
 If the event implements multiple interfaces the data will be taken from the first implemented interface in this order: `LoggableEvent`, `Arrayable`, `JsonSerializable`.
 
 ## Configuration
+To publish default configuration files run this command in console:
+```bash
+php artisan vendor:publish --tag=activity-logger:config
+```
+```php
+<?php
+
+/**
+ * Activity logger config
+ */
+return [
+
+    /** Channel to use for other logs */
+    'log_channel' => 'default',
+
+    /**
+     * Log channel definition
+     *
+     * @see https://laravel.com/docs/12.x/logging#configuration
+     **/
+    'channels' => [
+        'models' => [
+            'driver' => 'daily',
+            'days' => 60,
+            'path' => storage_path('logs/activity/models.log'),
+        ],
+        'access' => [
+            'driver' => 'daily',
+            'days' => 60,
+            'path' => storage_path('logs/activity/access.log'),
+        ],
+        'events' => [
+            'driver' => 'daily',
+            'days' => 60,
+            'path' => storage_path('logs/activity/events.log'),
+        ],
+        'default' => [
+            'driver' => 'daily',
+            'days' => 60,
+            'path' => storage_path('logs/activity/other.log'),
+        ],
+    ],
+
+    /** Model logs settings */
+    'models' => [
+        /** Channel to use for model activity */
+        'channel' => 'models',
+        /** Text to be replaced for hidden fields when tracking for changes */
+        'redacted_text' => '<redacted>',
+    ],
+
+    /** Event logs settings */
+    'events' => [
+        /** Channel to use for model activity */
+        'channel' => 'events',
+    ],
+
+    /** Logs only this urls */
+    'access' => [
+        /** Default channel to use for traffic (routes) logs */
+        'channel' => 'access',
+
+        /**
+         * Define matching rules for logging access requests
+         */
+        'match' => [
+            /**  Match paths
+             *
+             * @var bool|string|string[]
+             *                           - '*'|null match all
+             *                           - string - single match (ex. '/admin/*')
+             *                           - string[] - list of matches (ex. ['/admin/*', '/test/*'])
+             */
+            'path' => '*',
+            /**  Match paths
+             *
+             * @var bool|string|string[]
+             *                           - '*'|null match all
+             *                           - string - single match (ex. 'test.*')
+             *                           - string[] - list of matches (ex. ['test.*', 'dump.*'])
+             */
+            'routes' => '*',
+        ],
+
+        /**
+         * Define rules for excluding requests from  logs.
+         * If the
+         */
+        'exclude' => [
+            /**  Match paths
+             *
+             * @var bool|string|string[]
+             *                           - '*'|null match all
+             *                           - string - single match (ex. '/test/*')
+             *                           - string[] - list of matches (ex. ['/test/*', '/dump/*'])
+             */
+            'paths' => [],
+            /**  Match routes
+             *
+             * @var bool|string|string[]
+             *                           - '*'|null match all
+             *                           - string - single match (ex. 'test.*')
+             *                           - string[] - list of matches (ex. ['test.*', 'dump.*'])
+             */
+            'routes' => [],
+        ],
+    ],
+];
+```
+
+ - `log_channel` - string - identifies the channel to use for generic logs
+ - `channels` - array<string,array> - defines all the available log channels (see [Laravel log channel definition](https://laravel.com/docs/12.x/logging#configuration) )
+ - `models` - define model logs settings
+    - `channel` - string - defines the channel to use for models logs
+    - `redacted_text` - string - content to replace in hidden fields while tracing model changes.
+ - `events` - define event log settings
+    - `channel` - string - defines the channel to use for event logs 
+
+ - `access` - define access logs settings
+    - `channel` - string - defines the channel to use for traffic (routes) logs
+    - `match` - defines the routes/paths to log
+        - `path` - bool|string|string[] - ...
+        - `routes` - bool|string|string[] - ...
+    - `exclude` - defines the routes/paths to exclude (must be in matching rules)
+        - `path` - bool|string|string[] - ...
+        - `routes` - bool|string|string[]- ...
 
 ...TODO...
