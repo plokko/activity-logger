@@ -24,15 +24,16 @@ class ActivLogHandler extends AbstractProcessingHandler
     protected function write(LogRecord $record): void
     {
         $payload = [
-            'message' => $record->message,
-            'context' => $record->context,
+            'datetime' => $record->datetime->format(\DateTime::ATOM),
             'level' => $record->level->getName(),
-            'channel' => $record->channel,
-            'datetime' => $record->datetime->format('c'),
-            'extra' => $record->extra,
+            'message' => $record->message,
+            ...$record->context,
+            //'channel' => $record->channel,
+
+            ///'extra' => $record->extra, ///???
         ];
 
-        //dd($record, $payload);
+        dd($record, $payload);
         /// Send request
         $response = Http::baseUrl($this->endpoint)
             ->withToken($this->token)

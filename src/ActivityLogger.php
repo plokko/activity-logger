@@ -128,6 +128,7 @@ class ActivityLogger
         $extra = [
             'model_type' => $model_type,
             'model_id' => $model->getKey(), // model primary key
+            'model_event' => $event, // model primary key
         ];
         if ($model_data) {
             $extra['model_data'] = $model_data;
