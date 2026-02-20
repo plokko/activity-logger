@@ -67,6 +67,9 @@ return [
         /** Default channel to use for traffic (routes) logs */
         'channel' => 'access',
 
+        /** Ignore request from guests */
+        'ignore_guests' => true,
+
         /**
          * Define matching rules for logging access requests
          */

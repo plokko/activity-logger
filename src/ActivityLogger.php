@@ -297,6 +297,12 @@ class ActivityLogger
      */
     public function logAccessRequest(Request $request): bool
     {
+        $ignoreGuests = (bool) $this->config['access']['match']['ignore_guests'] ?? true;
+        if ($ignoreGuests && $request->guest()) {
+            // Ignore guests
+            return false;
+        }
+
         /// Check if request passes allowed/exluded routes ///
         if ($this->requestMatcher) {
             // Use requestMatcher
