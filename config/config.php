@@ -36,9 +36,15 @@ return [
         ],
         'activlog' => [
             'driver' => 'activlog',
+            /** ActivLog endpoint URL (ex. https://activlog.example ) */
             'endpoint' => env('ACTIVLOG_ENDPOINT'),
+            /** ActivLog token */
+            /** Timeout in seconds */
             'token' => env('ACTIVLOG_TOKEN'),
-            'timeout' => 2,
+            /** Timeout in seconds */
+            'timeout' => 5,
+            /** Enable async request (logging does not block main application) */
+            'async' => true,
         ],
     ],
 

@@ -29,6 +29,7 @@ class ActivityLoggerServiceProvider extends ServiceProvider
                 endpoint: $config['endpoint'] ?? 'http://localhost',
                 token: $config['token'] ?? '',
                 timeout: $config['timeout'] ?? 2,
+                async: (bool) ($config['async'] ?? true),
             ));
 
             return $logger;
