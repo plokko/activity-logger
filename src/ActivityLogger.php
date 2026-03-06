@@ -297,8 +297,8 @@ class ActivityLogger
      */
     public function logAccessRequest(Request $request): bool
     {
-        $ignoreGuests = (bool) $this->config['access']['match']['ignore_guests'] ?? true;
-        if ($ignoreGuests && $request->guest()) {
+        $ignoreGuests = (bool) $this->config['access']['ignore_guests'] ?? true;
+        if ($ignoreGuests && ! auth()->check()) {
             // Ignore guests
             return false;
         }
