@@ -13,18 +13,21 @@ class AccessLogger
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
-        /// Log request ///
+        $response = $next($request);
+        // Log request
         try {
-            ActivityLog::logAccessRequest($request);
+            ActivityLog::logAccessRequest(
+                $request,
+                $response
+            );
         } catch (\Throwable $error) {
-            Log::error('An error occurred while saving access log: ' . $error->getMessage(), compact('request', 'error'));
+            Log::error('An error occurred while saving access log: '.$error->getMessage(), compact('request', 'error'));
         }
 
-        /// Proceed with request ///
-        return $next($request);
+        return $response;
     }
 }

@@ -19,7 +19,7 @@ class LogEventActivity
      */
     public function handle(object $event): void
     {
-        /// Try to get data for event
+        // / Try to get data for event
         $data = null;
         if ($event instanceof LoggableEvent) {
             $data = $event->toLoggableData();
@@ -28,7 +28,7 @@ class LogEventActivity
         } elseif ($event instanceof JsonSerializable) {
             $data = $event->jsonSerialize();
         }
-        /// Log event
+        // / Log event
         ActivityLog::logEvent($event, $data);
     }
 }

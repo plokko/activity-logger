@@ -16,12 +16,12 @@ class ActivityLoggerServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        ///--- Publish config files ---///
+        // --- Publish config files ---//
         $this->publishes([
-            __DIR__ . '/../config/config.php' => config_path('activity-logger.php'),
+            __DIR__.'/../config/config.php' => config_path('activity-logger.php'),
         ], 'activity-logger:config');
 
-        ///-- Register custom Log Driver ---///
+        // -- Register custom Log Driver ---//
         Log::extend('activlog', function ($app, array $config) {
             $logger = new Logger('activlog');
 
@@ -45,14 +45,15 @@ class ActivityLoggerServiceProvider extends ServiceProvider
     {
         // Merge default config ///
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/config.php',
+            __DIR__.'/../config/config.php',
             'activity-logger'
         );
 
-        ///--- Facade accessor ---///
+        // --- Facade accessor --- //
         $this->app->singleton(ActivityLogger::class, function ($app) {
             return new ActivityLogger($app->config->get('activity-logger', []));
         });
+        $this->app->scoped(RequestContext::class);
     }
 
     public function provides()

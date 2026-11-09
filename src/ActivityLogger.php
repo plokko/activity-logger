@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Plokko\ActivityLogger\Contracts\LoggableModel;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpFoundation\Response;
 use UnexpectedValueException;
 
 /**
@@ -27,9 +29,9 @@ class ActivityLogger
      *
      * @param  string  $type  type: mode, acces or log
      */
-    protected function getLoggerFor(string $type): \Psr\Log\LoggerInterface
+    protected function getLoggerFor(string $type): LoggerInterface
     {
-        /// Get channel name based on log type ///
+        // / Get channel name based on log type ///
         $channel = match ($type) {
             'log' => $this->config['log_channel'] ?? 'default',
             'models', 'access', 'events' => $this->config[$type]['channel'] ?? 'default',
@@ -44,7 +46,7 @@ class ActivityLogger
      *
      * @param  string  $channel  channel name, defined in activity-loggable config
      */
-    protected function getLogger(string $channel): \Psr\Log\LoggerInterface
+    protected function getLogger(string $channel): LoggerInterface
     {
         $channelConfig = $this->config['channels'][$channel];
 
@@ -124,7 +126,7 @@ class ActivityLogger
 
         $model_type = $model->getMorphClass();
 
-        /// Model data ///
+        // / Model data ///
         $extra = [
             'model_type' => $model_type,
             'model_id' => $model->getKey(), // model primary key
@@ -161,11 +163,11 @@ class ActivityLogger
 
         $hidden = $model->getHidden();
         $redactText = $this->config['models']['redacted_text'] ?? '<redacted>';
-        /// Filter track data if specified ///
+        // / Filter track data if specified ///
         $filterData = function (array $data) use ($track, $hidden, $redactText): array {
             // Determina quali campi considerare
             $data = is_array($track) ? array_intersect_key($data, array_flip($track)) : $data;
-            /// Hide sensible data
+            // / Hide sensible data
             foreach ($hidden as $key) {
                 if (! empty($data[$key])) {
                     $data[$key] = $redactText;
@@ -174,7 +176,7 @@ class ActivityLogger
 
             return $data;
         };
-        /// Current data
+        // / Current data
         $current = match ($event) {
             'created' => $filterData($model->getAttributes()),
             'updated' => $filterData($model->getChanges()),
@@ -182,7 +184,7 @@ class ActivityLogger
             'deleted', 'forceDeleted' => $filterData($model->getOriginal()),
             default => null,
         };
-        /// Previus data
+        // / Previus data
         $previus = match ($event) {
             'updated' => collect($current)
                 ->mapWithKeys(fn ($value, $field) => [
@@ -227,7 +229,7 @@ class ActivityLogger
         $matchPaths = $this->config['access']['match']['paths'] ?? '*';
         $matchRoutes = $this->config['access']['match']['routes'] ?? '*';
 
-        /// If not catchall
+        // / If not catchall
         if (
             ($this->config['access']['match'] ?? null) === '*' ||
             ($matchPaths === '*' && $matchRoutes === '*')
@@ -235,7 +237,7 @@ class ActivityLogger
             return true;
         }
 
-        /// Check path match
+        // / Check path match
         if ($matchPaths !== '*') {
             if (is_string($matchPaths)) {
                 $matchPaths = [$matchPaths];
@@ -247,7 +249,7 @@ class ActivityLogger
             }
         }
 
-        /// Check route match
+        // / Check route match
         if ($matchRoutes !== '*') {
             if (is_string($matchRoutes)) {
                 $matchPaths = [$matchRoutes];
@@ -295,15 +297,16 @@ class ActivityLogger
      *
      * @return bool return true if it has been logged, false if it's in the exclude list.
      */
-    public function logAccessRequest(Request $request): bool
+    public function logAccessRequest(Request $request, ?Response $response): bool
     {
+        // Check if need to be logged
         $ignoreGuests = (bool) $this->config['access']['ignore_guests'] ?? true;
         if ($ignoreGuests && ! auth()->check()) {
             // Ignore guests
             return false;
         }
 
-        /// Check if request passes allowed/exluded routes ///
+        // / Check if request passes allowed/exluded routes ///
         if ($this->requestMatcher) {
             // Use requestMatcher
             if (! ($this->requestMatcher)($request)) {
@@ -312,23 +315,36 @@ class ActivityLogger
         } elseif (! $this->matchAllowedPaths($request) || $this->matchExcludedPaths($request)) {
             return false;
         }
-        // Todo: log
+        // Log request
+        $this->logRequest($request, $response);
 
+        return true;
+    }
+
+    public function logRequest(Request $request, ?Response $response): void
+    {
         $method = $request->getMethod();
         $uri = $request->getRequestUri();
         $client_ip = $request->getClientIp();
         $is_json = $request->isJson();
         $is_secure = $request->isSecure();
 
+        $statusCode = $response->getStatusCode();
+        $message = null;
+        if ($response->exception) {
+            $statusCode = $response->exception->status;
+            $message = $response->exception->getMessage();
+        } elseif ($response->isRedirect()) {
+            $message = $response->headers->get('Location');
+        }
+        $hasError = $statusCode >= 400;
         // Log access //
         $this->getLoggerFor('access')
-            ->notice("> $method $uri", $this->getLogData(
+            ->log($hasError ? 'error' : 'notice', "> $method $uri", $this->getLogData(
                 type: 'access',
-                context: null,
-                extra: compact('method', 'uri', 'client_ip', 'is_json', 'is_secure'),
+                context: $this->requestContext()->all(),
+                extra: array_filter(compact('method', 'uri', 'client_ip', 'is_json', 'is_secure', 'statusCode', 'message')),
             ));
-
-        return true;
     }
 
     /**
@@ -352,9 +368,26 @@ class ActivityLogger
             'auth_id' => $user?->id, // User id
             'auth_class' => $user?->getMorphClass(), // <-- Write morphed class (polymotphic type) or className
             'auth_data' => $user_data,
-            ///todo: Cast user data?
+            // /todo: Cast user data?
             'context' => $context,
             ...$extra,
         ]);
+    }
+
+    protected function requestContext(): RequestContext
+    {
+        return app(RequestContext::class);
+    }
+
+    public function addRequestContext(array $context): static
+    {
+        $this->requestContext()->add($context);
+
+        return $this;
+    }
+
+    public function getRequestContext(): array
+    {
+        return $this->requestContext()->all();
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Plokko\ActivityLogger\Logging;
 
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Monolog\Handler\AbstractProcessingHandler;
@@ -29,12 +30,12 @@ class ActivLogHandler extends AbstractProcessingHandler
             'level' => $record->level->getName(),
             'message' => $record->message,
             ...$record->context,
-            //'channel' => $record->channel,
+            // 'channel' => $record->channel,
 
-            ///'extra' => $record->extra, ///???
+            // /'extra' => $record->extra, ///???
         ];
 
-        /// Send request
+        // / Send request
         $pending = Http::async($this->async)
             ->baseUrl($this->endpoint)
             ->withToken($this->token)
@@ -42,10 +43,10 @@ class ActivLogHandler extends AbstractProcessingHandler
             ->asJson()
             ->acceptJson()
             ->post('/api/logs', $payload)
-            ->then(function (\Illuminate\Http\Client\Response $response) {
+            ->then(function (Response $response) {
                 if (! $response->successful() || $response->json('successfull') !== true) {
                     $e = $response->toException();
-                    Log::error('Unable to send ActiveLog logs: ' . $e?->getMessage(), ['endpoint' => $this->endpoint, 'timeout' => $this->timeout, 'error' => $e]);
+                    Log::error('Unable to send ActiveLog logs: '.$e?->getMessage(), ['endpoint' => $this->endpoint, 'timeout' => $this->timeout, 'error' => $e]);
                 }
             });
 
