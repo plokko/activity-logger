@@ -3,13 +3,21 @@
 namespace Plokko\ActivityLogger;
 
 use Closure;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\RecordsNotFoundException;
 use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Plokko\ActivityLogger\Contracts\LoggableModel;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Throwable;
 use UnexpectedValueException;
 
 /**
@@ -99,11 +107,11 @@ class ActivityLogger
     /**
      * Internal function to log model events
      *
-     * @internal
-     *
      * @param  string  $event  model event name
      * @param  Model  $model  model
      * @return bool true if the model event has been logged
+     *
+     * @internal
      */
     public function logModelEvent(string $event, Model $model): bool
     {
@@ -292,10 +300,9 @@ class ActivityLogger
      * Internal function, logs request from middleware
      *
      * @param  Request  $request  Request to be logged
+     * @return bool return true if it has been logged, false if it's in the exclude list.
      *
      * @internal
-     *
-     * @return bool return true if it has been logged, false if it's in the exclude list.
      */
     public function logAccessRequest(Request $request, ?Response $response): bool
     {
@@ -321,7 +328,7 @@ class ActivityLogger
         return true;
     }
 
-    public function logRequest(Request $request, ?Response $response): void
+    public function logRequest(Request $request, ?Response $response, ?Throwable $exception = null): void
     {
         $method = $request->getMethod();
         $uri = $request->getRequestUri();
@@ -329,22 +336,54 @@ class ActivityLogger
         $is_json = $request->isJson();
         $is_secure = $request->isSecure();
 
-        $statusCode = $response->getStatusCode();
+        $exception ??= $response?->exception ?? null;
+
+        $statusCode = $this->resolveStatusCode($response, $exception);
+        $exception_class = $exception ? $exception::class : null;
         $message = null;
-        if ($response->exception) {
-            $statusCode = $response->exception->status;
-            $message = $response->exception->getMessage();
-        } elseif ($response->isRedirect()) {
+
+        if ($exception) {
+            $message = $exception->getMessage() ?: null;
+        } elseif ($response?->isRedirect()) {
             $message = $response->headers->get('Location');
         }
-        $hasError = $statusCode >= 400;
-        // Log access //
+
         $this->getLoggerFor('access')
-            ->log($hasError ? 'error' : 'notice', "> $method $uri", $this->getLogData(
+            ->log(match (true) {
+                $statusCode >= 500 => 'error',
+                $statusCode >= 400 => 'warning',
+                default => 'notice',
+            }, "> $method $uri", $this->getLogData(
                 type: 'access',
-                context: $this->requestContext()->all(),
-                extra: array_filter(compact('method', 'uri', 'client_ip', 'is_json', 'is_secure', 'statusCode', 'message')),
+                context: $this->requestContext()->all() ?: null,
+                extra: array_filter(
+                    compact('method', 'uri', 'client_ip', 'is_json', 'is_secure', 'statusCode', 'message', 'exception_class'),
+                    fn ($v) => $v !== null,
+                ),
             ));
+    }
+
+    protected function resolveStatusCode(?Response $response, ?Throwable $exception): int
+    {
+        if ($exception && ($code = $this->statusFromException($exception)) !== null) {
+            return $code;
+        }
+
+        return $response?->getStatusCode() ?? ($exception ? 500 : 200);
+    }
+
+    protected function statusFromException(Throwable $exception): ?int
+    {
+        return match (true) {
+            $exception instanceof HttpExceptionInterface => $exception->getStatusCode(),
+            $exception instanceof ValidationException => $exception->status, // 422
+            $exception instanceof AuthenticationException => 401,
+            $exception instanceof AuthorizationException => $exception->status() ?? 403,
+            $exception instanceof ModelNotFoundException,
+            $exception instanceof RecordsNotFoundException => 404,
+            $exception instanceof TokenMismatchException => 419,
+            default => null,
+        };
     }
 
     /**
